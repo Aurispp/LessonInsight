@@ -1,60 +1,70 @@
 import pyaudio
-import wave  # Add this import
-import time
-import whisper
+import wave
+import threading
+from datetime import datetime
+from pathlib import Path
 
-# Previous setup code stays the same
+current_file = Path(__file__)  
+print(f"Current file location: {current_file}")
+
+project_root = current_file.parent.parent.parent
+print(f"Project root: {project_root}")
+
+# Set audio directory path
+audio_dir = project_root / "audio_files"
+print(f"Audio directory: {audio_dir}")
+# Setup audio
 audio = pyaudio.PyAudio()
 format = pyaudio.paInt16
 channels = 1
 rate = 44100
 chunk = 1024
 frames = []
+is_recording = True
 
-stream = audio.open(
-    format=format,
-    channels=channels,
-    rate=rate,
-    input=True,
-    frames_per_buffer=chunk
-)
+def stop_recording():
+    global is_recording
+    input("Press Enter to stop recording...\n")
+    is_recording = False
 
-# Recording code
-chunks_per_second = int(rate / chunk)
-recording_seconds = 5
-total_chunks = chunks_per_second * recording_seconds
+print("Starting setup...")
 
-print(f"Recording for {recording_seconds} seconds...")
+try:
+    stream = audio.open(
+        format=format,
+        channels=channels,
+        rate=rate,
+        input=True,
+        frames_per_buffer=chunk
+    )
+    print("Audio stream opened successfully")
+except Exception as e:
+    print(f"Error opening stream: {e}")
+    exit()
 
-for i in range(total_chunks):
-    data = stream.read(chunk)
-    frames.append(data)
-    if i % chunks_per_second == 0:
-        print(f"Second {i//chunks_per_second + 1}...")
+# Start a thread to watch for the stop signal
+stop_thread = threading.Thread(target=stop_recording)
+stop_thread.start()
 
-print("Done recording")
+print("Recording... Press Enter to stop")
 
-# Clean up the audio stream
-stream.stop_stream()
-stream.close()
-audio.terminate()
+# Record until Enter is pressed
+while is_recording:
+    try:
+        data = stream.read(chunk)
+        frames.append(data)
+    except Exception as e:
+        print(f"Error during recording: {e}")
+        break
 
-# Now let's save the file
-# Can you guess what 'wb' means? (hint: write binary)
-with wave.open('my_recording.wav', 'wb') as wave_file:
+print("Recording finished! Saving file...")
+
+timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+filename = audio_dir / f"recording_{timestamp}.wav"
+with wave.open(str(filename), 'wb') as wave_file:
     wave_file.setnchannels(channels)
     wave_file.setsampwidth(audio.get_sample_size(format))
     wave_file.setframerate(rate)
     wave_file.writeframes(b''.join(frames))
-
-print("Saved as my_recording.wav")
-
-def transcribe_audio(file_path):
-    model = whisper.load_model("large-v3-turbo")
-    result = model.transcribe(file_path)
-    return result["text"]
-
-audio_file = "my_recording.wav"
-print("Transcribing audio...")
-transcription = transcribe_audio(audio_file)
-print("Transcriptiion", transcription)
+    
+print(f"Saved as {filename}")
