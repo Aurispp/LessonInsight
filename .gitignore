@@ -28,6 +28,7 @@ wheels/
 
 # Audio Files
 audio_files/
+transcripts/
 *.wav
 *.mp3
 *.m4a
