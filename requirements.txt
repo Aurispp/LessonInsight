@@ -1,4 +1,16 @@
-pyaudio
-openai-whisper
-torch
-numpy
+# Audio processing
+pyaudio==0.2.14
+numpy==1.26.2
+wave==0.0.2
+torchaudio==2.1.1
+soundfile==0.12.1
+
+# Speech recognition and speaker diarization
+whisperx==3.1.1
+torch==2.1.1
+speechbrain==1.0.0
+pyannote.audio==3.1.1
+
+# Environment and utils
+python-dotenv==1.0.0
+pathlib==1.0.1
