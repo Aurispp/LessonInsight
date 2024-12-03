@@ -1,8 +1,19 @@
-# Virtual Environment
-venv/
-env/
-.env/
-.venv/
+# Environment variables and sensitive data
+.env
+*.keys.json
+*.token
+
+# Audio files
+audio_files/
+*.wav
+*.mp3
+*.m4a
+
+# Speaker recognition data
+speaker_embeddings/
+*/speaker_embeddings/
+speaker_embeddings.pkl
+**/pretrained_models/
 
 # Python
 __pycache__/
@@ -10,6 +21,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+env/
 build/
 develop-eggs/
 dist/
@@ -26,18 +38,26 @@ wheels/
 .installed.cfg
 *.egg
 
-# Audio Files
-audio_files/
-transcripts/
-*.wav
-*.mp3
-*.m4a
-*.aac
-my_recording.wav
+# Virtual Environment
+venv/
+ENV/
+.env/
+.venv/
 
-# IDE specific files
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 .DS_Store
+
+# Logs and databases
+*.log
+*.sqlite
+*.db
+
+# Model checkpoints and large files
+*.pth
+*.ckpt
+*.pt
+*.bin
