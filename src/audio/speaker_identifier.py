@@ -7,13 +7,11 @@ import json
 from datetime import datetime
 import logging
 
-# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class SpeakerIdentifier:
     def __init__(self, speaker_manager, class_schedule):
-        """Initialize SpeakerIdentifier with dependencies"""
         self.speaker_manager = speaker_manager
         self.class_schedule = class_schedule
         self.samples_dir = Path(__file__).parent.parent.parent / "speaker_samples"
@@ -22,7 +20,7 @@ class SpeakerIdentifier:
         # Configuration
         self.min_segment_duration = 1.0  # Minimum duration in seconds
         self.high_confidence_threshold = 0.7
-        self.base_confidence_threshold = 0.45
+        self.medium_confidence_threshold = 0.45
 
     def extract_speaker_samples(self, audio: np.ndarray, segments: List[Dict], sample_rate: int = 16000) -> Dict[str, List[Dict]]:
         """Extract high-quality audio samples for each speaker"""
@@ -37,6 +35,10 @@ class SpeakerIdentifier:
             speaker = segment['speaker'].replace('SPEAKER_', '')
             speaker_id = f"SPEAKER_{speaker}"
             
+            # Skip if already confidently identified
+            if segment.get('speaker_name') and segment.get('confidence', 0) > self.high_confidence_threshold:
+                continue
+                
             if speaker_id not in speaker_segments:
                 speaker_segments[speaker_id] = []
             speaker_segments[speaker_id].append(segment)
@@ -54,7 +56,6 @@ class SpeakerIdentifier:
                 end_sample = int(segment["end"] * sample_rate)
                 duration = end_sample - start_sample
                 
-                # Only accept segments longer than minimum duration
                 if duration >= self.min_segment_duration * sample_rate:
                     segment_audio = audio[start_sample:end_sample]
                     speaker_samples[speaker_id].append({
@@ -65,7 +66,6 @@ class SpeakerIdentifier:
                     })
                     total_duration += duration
                     
-                    # Stop if we have enough samples
                     if total_duration >= 10 * sample_rate and len(speaker_samples[speaker_id]) >= 2:
                         break
         
@@ -80,7 +80,7 @@ class SpeakerIdentifier:
                 logger.info(f"- Duration: {sample['end'] - sample['start']:.1f}s")
         
         return speaker_samples
-    
+
     def save_speaker_samples(self, speaker_samples: Dict[str, List[Dict]], audio_path: Path) -> Optional[Path]:
         """Save speaker samples to disk"""
         if not speaker_samples:
@@ -97,22 +97,18 @@ class SpeakerIdentifier:
             if not samples:
                 continue
             
-            # Create speaker directory
             speaker_dir = samples_dir / speaker_id
             speaker_dir.mkdir(exist_ok=True)
             logger.info(f"\nSaving samples for {speaker_id}:")
             
-            # Save samples
             for i, sample in enumerate(samples):
                 sample_path = speaker_dir / f"sample_{i+1}.wav"
-                # Convert to torch tensor for saving
                 waveform = torch.from_numpy(sample["audio"]).float()
                 if waveform.dim() == 1:
                     waveform = waveform.unsqueeze(0)
                 torchaudio.save(sample_path, waveform, 16000)
                 logger.info(f"- Saved {sample_path.name}")
                 
-                # Save sample metadata
                 meta_path = speaker_dir / f"sample_{i+1}.json"
                 with open(meta_path, 'w') as f:
                     json.dump({
@@ -122,120 +118,83 @@ class SpeakerIdentifier:
                     }, f, indent=2)
         
         return samples_dir
-    
-    def identify_speakers(self, samples_dir: Path) -> bool:
-            """Create or enhance speaker profiles from samples"""
-            if not self.speaker_manager:
-                logger.error("Speaker manager not initialized.")
-                return False
-                
-            if not samples_dir:
-                return False
-                
-            logger.info("\nStarting speaker identification...")
-            identified_any = False
-            
-            for speaker_dir in samples_dir.glob("SPEAKER_*"):
-                speaker_id = speaker_dir.name
-                samples = list(speaker_dir.glob("sample_*.wav"))
-                if not samples:
-                    continue
-                    
-                # Find best match among existing profiles
-                best_match = None
-                highest_similarity = -1
-                
-                for name, stored_embedding in self.speaker_manager.speaker_embeddings.items():
-                    similarities = []
-                    for sample_path in samples:
-                        try:
-                            waveform, _ = torchaudio.load(sample_path)
-                            waveform = waveform.to(self.speaker_manager.device)
-                            embedding = self.speaker_manager.speaker_model.encode_batch(waveform)
-                            
-                            similarity = torch.nn.functional.cosine_similarity(
-                                embedding[0].view(1, -1),
-                                stored_embedding.view(1, -1)
-                            ).item()
-                            similarities.append(similarity)
-                        except Exception as e:
-                            logger.error(f"Error processing sample: {e}")
-                            continue
-                    
-                    if similarities:
-                        avg_similarity = sorted(similarities)[len(similarities)//2]  # median
-                        if avg_similarity > highest_similarity:
-                            highest_similarity = avg_similarity
-                            best_match = name
 
-                # Handle profile creation/enhancement
-                if best_match and highest_similarity > 0.6:  # High confidence match
-                    logger.info(f"\nConfidently identified as {best_match} (confidence: {highest_similarity:.2f})")
+    def identify_speakers(self, samples_dir: Path) -> bool:
+        """Create or enhance speaker profiles from samples"""
+        if not self.speaker_manager or not samples_dir:
+            return False
+            
+        logger.info("\nStarting speaker identification...")
+        identified_any = False
+        
+        # Process each speaker's directory
+        for speaker_dir in samples_dir.glob("SPEAKER_*"):
+            speaker_id = speaker_dir.name
+            samples = list(speaker_dir.glob("sample_*.wav"))
+            if not samples:
+                continue
+            
+            # Show samples for this speaker
+            logger.info(f"\nProcessing {speaker_id}:")
+            for i, sample_path in enumerate(samples, 1):
+                meta_path = sample_path.with_suffix('.json')
+                if meta_path.exists():
+                    with open(meta_path) as f:
+                        meta = json.load(f)
+                        logger.info(f"Sample {i}: {meta.get('text', 'No text available')}")
+            
+            # Get user input for speaker name
+            while True:
+                name = input("\nEnter speaker name (or 'skip' to skip): ").strip()
+                if name.lower() == 'skip':
+                    break
+                
+                if name:
                     try:
-                        # Automatically enhance profile
+                        # Process all samples for this speaker
                         for sample_path in samples:
                             waveform, _ = torchaudio.load(sample_path)
                             audio = waveform.numpy()[0]
-                            segment = {
-                                'start': 0,
-                                'end': len(audio) / 16000,
-                                'speaker_name': best_match
-                            }
-                            self.speaker_manager.enhance_speaker_profile(best_match, audio, [segment])
-                        logger.info(f"Enhanced profile for {best_match}")
-                        identified_any = True
-                    except Exception as e:
-                        logger.error(f"Error enhancing profile: {e}")
-                
-                elif best_match and highest_similarity > 0.45:  # Medium confidence match
-                    logger.info(f"\nThis might be {best_match} (confidence: {highest_similarity:.2f})")
-                    if input(f"Would you like to enhance {best_match}'s profile with these samples? (y/n): ").lower() == 'y':
-                        try:
-                            for sample_path in samples:
-                                waveform, _ = torchaudio.load(sample_path)
-                                audio = waveform.numpy()[0]
+                            
+                            if name in self.speaker_manager.speaker_embeddings:
+                                # Enhance existing profile
                                 segment = {
                                     'start': 0,
                                     'end': len(audio) / 16000,
-                                    'speaker_name': best_match
+                                    'speaker_name': name
                                 }
-                                self.speaker_manager.enhance_speaker_profile(best_match, audio, [segment])
-                            logger.info(f"Enhanced profile for {best_match}")
-                            identified_any = True
-                        except Exception as e:
-                            logger.error(f"Error enhancing profile: {e}")
-                
-                else:  # No good match found
-                    name = input("\nEnter speaker name (or 'skip' to skip): ").strip()
-                    if name.lower() != 'skip' and name:
-                        try:
-                            for sample_path in samples:
-                                waveform, _ = torchaudio.load(sample_path)
-                                audio = waveform.numpy()[0]
+                                self.speaker_manager.enhance_speaker_profile(name, audio, [segment])
+                                logger.info(f"Enhanced profile for {name}")
+                            else:
+                                # Create new profile
                                 self.speaker_manager.create_profile_from_segment(
                                     audio,
                                     start_time=0,
                                     end_time=len(audio) / 16000,
                                     speaker_name=name
                                 )
-                            logger.info(f"Created profile for {name}")
-                            identified_any = True
-                        except Exception as e:
-                            logger.error(f"Error creating profile: {e}")
-            
-            if identified_any:
-                logger.info("\nSpeaker identification completed successfully!")
-            else:
-                logger.info("\nNo new speakers were identified.")
-            
-            return identified_any
-    
+                                logger.info(f"Created profile for {name}")
+                            
+                        identified_any = True
+                        break
+                    except Exception as e:
+                        logger.error(f"Error processing profile: {e}")
+                        if input("Would you like to try again? (y/n): ").lower() != 'y':
+                            break
+        
+        if identified_any:
+            logger.info("\nSpeaker identification completed successfully!")
+        else:
+            logger.info("\nNo new speakers were identified.")
+        
+        return identified_any
+
     def identify_speakers_in_segments(self, audio: np.ndarray, segments: List[Dict], recording_time: Optional[datetime] = None) -> Set[str]:
         """Identify speakers in audio segments using voice embeddings"""
         if not self.speaker_manager:
             return set()
-        
-        # Get class information for confidence adjustment
+            
+        # Get class information
         class_info = None
         if recording_time and self.class_schedule:
             class_info = self.class_schedule.get_class_info(recording_time)
@@ -243,7 +202,7 @@ class SpeakerIdentifier:
                 logger.info(f"\nDetected class: {class_info['name']}")
                 logger.info(f"Expected speakers: {', '.join(sorted(class_info['speakers']))}")
         
-        # Collect segments by speaker
+        # Group segments by speaker
         speaker_segments = {}
         for segment in segments:
             if "speaker" not in segment:
@@ -258,8 +217,11 @@ class SpeakerIdentifier:
         
         # Process each speaker
         for speaker_id, speaker_segments_list in speaker_segments.items():
-            # Skip if already identified
-            if all("speaker_name" in segment for segment in speaker_segments_list):
+            # Skip if already identified with high confidence
+            if all(
+                segment.get('speaker_name') and segment.get('confidence', 0) > self.high_confidence_threshold 
+                for segment in speaker_segments_list
+            ):
                 speaker_name = speaker_segments_list[0]["speaker_name"]
                 logger.info(f"\nSpeaker {speaker_id} already identified as {speaker_name}")
                 continue
@@ -267,14 +229,10 @@ class SpeakerIdentifier:
             # Get embeddings for all segments
             segment_embeddings = []
             for segment in speaker_segments_list:
-                if "speaker_name" in segment:
-                    continue
-                    
                 start_sample = int(segment["start"] * 16000)
                 end_sample = int(segment["end"] * 16000)
                 segment_audio = audio[start_sample:end_sample]
                 
-                # Skip short segments
                 if len(segment_audio) < self.min_segment_duration * 16000:
                     continue
                     
@@ -294,7 +252,6 @@ class SpeakerIdentifier:
                 similarities = []
                 for embedding in segment_embeddings:
                     try:
-                        # Calculate cosine similarity with L2 normalization
                         emb1 = torch.nn.functional.normalize(embedding.unsqueeze(0), p=2, dim=1)
                         emb2 = torch.nn.functional.normalize(stored_embedding.unsqueeze(0), p=2, dim=1)
                         similarity = torch.nn.functional.cosine_similarity(emb1, emb2).item()
@@ -304,11 +261,8 @@ class SpeakerIdentifier:
                         continue
                 
                 if similarities:
-                    # Use median similarity
                     similarities.sort()
                     median_similarity = similarities[len(similarities)//2]
-                    
-                    # Apply role-based boost
                     boost = self.speaker_manager.get_similarity_boost(name, class_info)
                     adjusted_similarity = median_similarity * boost
                     
@@ -316,7 +270,7 @@ class SpeakerIdentifier:
                         highest_similarity = adjusted_similarity
                         best_match = name
 
-            # Get confidence threshold
+            # Update segments based on confidence
             if best_match:
                 threshold = self.speaker_manager.get_speaker_confidence_threshold(best_match, class_info)
                 
@@ -325,9 +279,8 @@ class SpeakerIdentifier:
                     
                     # Update all segments from this speaker
                     for segment in speaker_segments_list:
-                        if "speaker_name" not in segment:
-                            segment["speaker_name"] = best_match
-                            segment["confidence"] = highest_similarity
+                        segment["speaker_name"] = best_match
+                        segment["confidence"] = highest_similarity
                     
                     # Enhance profile with high-confidence segments
                     high_quality_segments = []
@@ -354,7 +307,7 @@ class SpeakerIdentifier:
             else:
                 logger.info(f"\nNo matching profile found for {speaker_id}")
         
-        # Generate summary
+        # Generate summary of current state
         identified_speakers = {segment.get("speaker_name") for segment in segments if "speaker_name" in segment}
         unidentified_speakers = {f"SPEAKER_{segment['speaker']}" for segment in segments 
                                if "speaker" in segment and "speaker_name" not in segment}
