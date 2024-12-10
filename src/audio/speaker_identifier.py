@@ -20,7 +20,7 @@ class SpeakerIdentifier:
         # Configuration
         self.min_segment_duration = 1.0  # Minimum duration in seconds
         self.high_confidence_threshold = 0.7
-        self.medium_confidence_threshold = 0.45
+        self.medium_confidence_threshold = 0.28
 
     def extract_speaker_samples(self, audio: np.ndarray, segments: List[Dict], sample_rate: int = 16000) -> Dict[str, List[Dict]]:
         """Extract high-quality audio samples for each speaker"""

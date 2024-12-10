@@ -318,7 +318,7 @@ class SpeakerManager:
 
     def get_speaker_confidence_threshold(self, speaker_name: str, class_info: Optional[Dict]) -> float:
         """Get dynamic confidence threshold"""
-        base_threshold = 0.45
+        base_threshold = 0.28
         
         if speaker_name == self.teacher_name:
             return base_threshold - 0.10

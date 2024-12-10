@@ -1,43 +1,45 @@
 import pyaudio
 import wave
-import threading
 import numpy as np
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Tuple
-import queue
+from typing import Optional, Tuple
 
-class MultiSourceRecorder:
+class LocalRecorder:
     def __init__(self):
         self.audio = pyaudio.PyAudio()
         self.format = pyaudio.paFloat32
-        self.channels = 2
+        self.channels = 1
         self.rate = 48000
-        self.chunk = 480
-        self.mic_buffer = queue.Queue(maxsize=1000)
-        self.system_buffer = queue.Queue(maxsize=1000)
+        self.chunk = 1024
+        self.frames = []
         self.is_recording = False
-        self.mic_stream: Optional[pyaudio.Stream] = None
-        self.system_stream: Optional[pyaudio.Stream] = None
-        self.recording_finished = threading.Event()
-        self.save_finished = threading.Event()
+        self.stream = None
         
-        # Set up paths
+        # Set up audio directory
         self.audio_dir = Path(__file__).parent.parent.parent / "audio_files"
         self.audio_dir.mkdir(parents=True, exist_ok=True)
 
-    def get_device_by_name(self, name: str) -> Optional[int]:
-        """Get device ID by its name."""
+    def get_macbook_mic(self) -> Optional[int]:
+        """Get the MacBook Pro Microphone device ID."""
         info = self.audio.get_host_api_info_by_index(0)
         num_devices = info.get('deviceCount')
         
         for i in range(num_devices):
             device_info = self.audio.get_device_info_by_host_api_device_index(0, i)
-            if name.lower() in device_info.get('name').lower():
+            if "macbook pro microphone" in device_info.get('name', '').lower():
                 return i
+                
+        # Try alternative names
+        for i in range(num_devices):
+            device_info = self.audio.get_device_info_by_host_api_device_index(0, i)
+            name = device_info.get('name', '').lower()
+            if "built-in microphone" in name or "built-in input" in name:
+                return i
+        
         return None
 
-    def list_audio_devices(self):
+    def list_devices(self):
         """List all available audio input devices."""
         info = self.audio.get_host_api_info_by_index(0)
         num_devices = info.get('deviceCount')
@@ -51,229 +53,130 @@ class MultiSourceRecorder:
             print(f"   Inputs: {device_info.get('maxInputChannels')}")
             print("-" * 50)
 
-    def setup_local_recording(self) -> bool:
-        """Setup recording using MacBook's built-in microphone."""
-        mic_id = self.get_device_by_name("MacBook Pro Microphone")
-        if mic_id is None:
-            print("Error: Could not find MacBook Pro Microphone")
-            return False
-        return self.setup_streams(mic_id=mic_id)
-
-    def setup_online_recording(self) -> bool:
-        """Setup recording using external microphone and BlackHole."""
-        mic_id = self.get_device_by_name("External Microphone")
-        blackhole_id = self.get_device_by_name("BlackHole")
-        
-        if mic_id is None:
-            print("Error: Could not find External Microphone")
-            return False
-        if blackhole_id is None:
-            print("Error: Could not find BlackHole device")
-            return False
-            
-        return self.setup_streams(mic_id=mic_id, system_id=blackhole_id)
-
-    def setup_streams(self, mic_id: Optional[int] = None, system_id: Optional[int] = None) -> bool:
-        """Set up audio streams."""
-        try:
-            if mic_id is not None:
-                self.mic_stream = self.audio.open(
-                    format=self.format,
-                    channels=1,  # Mono input
-                    rate=self.rate,
-                    input=True,
-                    input_device_index=mic_id,
-                    frames_per_buffer=self.chunk,
-                    stream_callback=self._mic_callback
-                )
-
-            if system_id is not None:
-                self.system_stream = self.audio.open(
-                    format=self.format,
-                    channels=2,  # Stereo input
-                    rate=self.rate,
-                    input=True,
-                    input_device_index=system_id,
-                    frames_per_buffer=self.chunk,
-                    stream_callback=self._system_callback
-                )
-            return True
-        except Exception as e:
-            print(f"Error opening streams: {e}")
-            return False
-
-    def _mic_callback(self, in_data, frame_count, time_info, status) -> Tuple[bytes, int]:
-        """Callback for microphone stream."""
-        if self.is_recording:
+    def audio_callback(self, in_data, frame_count, time_info, status) -> Tuple[bytes, int]:
+        """Audio stream callback."""
+        if self.is_recording and in_data:
             try:
                 audio_data = np.frombuffer(in_data, dtype=np.float32)
-                stereo_data = np.repeat(audio_data, 2)
-                self.mic_buffer.put_nowait(stereo_data)
-            except queue.Full:
-                pass  # Drop frame if buffer is full
-        return (in_data, pyaudio.paContinue)
-
-    def _system_callback(self, in_data, frame_count, time_info, status) -> Tuple[bytes, int]:
-        """Callback for system audio stream."""
-        if self.is_recording:
-            try:
-                audio_data = np.frombuffer(in_data, dtype=np.float32)
-                self.system_buffer.put_nowait(audio_data)
-            except queue.Full:
-                pass  # Drop frame if buffer is full
-        return (in_data, pyaudio.paContinue)
-
-    def _save_recording(self):
-        """Mix and save the recorded audio."""
-        mixed_frames = []
-        
-        while self.is_recording or not (self.mic_buffer.empty() and self.system_buffer.empty()):
-            try:
-                # Get frames from both sources
-                try:
-                    mic_data = self.mic_buffer.get(timeout=0.1) * 0.6
-                except queue.Empty:
-                    mic_data = np.zeros(self.chunk * 2, dtype=np.float32)
-                
-                try:
-                    system_data = self.system_buffer.get(timeout=0.1) * 0.8
-                except queue.Empty:
-                    system_data = np.zeros(self.chunk * 2, dtype=np.float32)
-                
-                # Mix the frames
-                mixed_frame = mic_data + system_data
-                mixed_frames.append(mixed_frame)
-                
+                self.frames.append(audio_data.copy())
             except Exception as e:
-                print(f"Mixing error: {e}")
-                continue
-
-        # Save the recording
-        if mixed_frames:
-            try:
-                # Concatenate and normalize
-                audio_data = np.concatenate(mixed_frames)
-                max_val = np.max(np.abs(audio_data))
-                if max_val > 0:
-                    audio_data = audio_data / max_val * 0.9
-                
-                # Convert to int16
-                audio_data = (audio_data * 32767).astype(np.int16)
-                
-                # Save to file
-                timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-                filename = self.audio_dir / f"recording_{timestamp}.wav"
-                
-                with wave.open(str(filename), 'wb') as wave_file:
-                    wave_file.setnchannels(2)
-                    wave_file.setsampwidth(2)
-                    wave_file.setframerate(self.rate)
-                    wave_file.writeframes(audio_data.tobytes())
-                
-                print(f"\nRecording saved as: {filename}")
-                
-            except Exception as e:
-                print(f"Error saving recording: {e}")
-
-        self.save_finished.set()
+                print(f"Error in audio callback: {e}")
+        return (in_data, pyaudio.paContinue)
 
     def start_recording(self) -> bool:
-        """Start recording."""
-        # Clear buffers
-        while not self.mic_buffer.empty():
-            self.mic_buffer.get()
-        while not self.system_buffer.empty():
-            self.system_buffer.get()
-        
-        self.recording_finished.clear()
-        self.save_finished.clear()
-        self.is_recording = True
-        
-        if self.mic_stream:
-            self.mic_stream.start_stream()
-        if self.system_stream:
-            self.system_stream.start_stream()
-        
-        # Start saving thread
-        threading.Thread(target=self._save_recording, daemon=True).start()
-        
-        # Start monitor thread
-        threading.Thread(target=self._monitor_recording).start()
-        
-        print("\nRecording... Press Enter to stop")
-        return True
+        """Start recording from MacBook microphone."""
+        try:
+            mic_id = self.get_macbook_mic()
+            if mic_id is None:
+                print("Error: Could not find MacBook microphone")
+                return False
 
-    def _monitor_recording(self):
-        """Monitor for stop signal."""
-        input("")  # Wait for Enter key
-        self.stop_recording()
+            # Get device info
+            device_info = self.audio.get_device_info_by_host_api_device_index(0, mic_id)
+            print(f"\nUsing microphone: {device_info['name']}")
+            
+            # Open stream
+            self.stream = self.audio.open(
+                format=self.format,
+                channels=self.channels,
+                rate=self.rate,
+                input=True,
+                input_device_index=mic_id,
+                frames_per_buffer=self.chunk,
+                stream_callback=self.audio_callback
+            )
+            
+            # Start recording
+            self.frames = []
+            self.is_recording = True
+            self.stream.start_stream()
+            
+            print("\nRecording... Press Enter to stop")
+            input("")  # Wait for Enter key
+            
+            return True
+            
+        except Exception as e:
+            print(f"Error starting recording: {e}")
+            return False
 
     def stop_recording(self):
-        """Stop the recording."""
+        """Stop recording and save the file."""
         if not self.is_recording:
             return
 
         print("\nStopping recording...")
         self.is_recording = False
         
-        # Wait for saving to complete
-        self.save_finished.wait(timeout=10)
-        
-        if self.mic_stream:
-            self.mic_stream.stop_stream()
-            self.mic_stream.close()
-        if self.system_stream:
-            self.system_stream.stop_stream()
-            self.system_stream.close()
+        if self.stream:
+            self.stream.stop_stream()
+            self.stream.close()
+            self.stream = None
+
+        # Save the recording
+        if self.frames:
+            try:
+                # Process audio data
+                audio_data = np.concatenate(self.frames)
+                
+                # Normalize
+                max_val = np.max(np.abs(audio_data))
+                if max_val > 0:
+                    audio_data = audio_data / max_val * 0.9
+                
+                # Convert to stereo
+                stereo_data = np.column_stack((audio_data, audio_data))
+                final_data = (stereo_data.flatten() * 32767).astype(np.int16)
+                
+                # Save to file
+                timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                filename = self.audio_dir / f"recording_{timestamp}.wav"
+                
+                with wave.open(str(filename), 'wb') as wave_file:
+                    wave_file.setnchannels(2)  # Save as stereo
+                    wave_file.setsampwidth(2)
+                    wave_file.setframerate(self.rate)
+                    wave_file.writeframes(final_data.tobytes())
+                
+                print(f"\nRecording saved as: {filename}")
+                
+            except Exception as e:
+                print(f"Error saving recording: {e}")
 
     def __del__(self):
         """Cleanup."""
+        if hasattr(self, 'stream') and self.stream:
+            self.stream.stop_stream()
+            self.stream.close()
         if hasattr(self, 'audio'):
             self.audio.terminate()
 
 def main():
-    recorder = MultiSourceRecorder()
+    recorder = LocalRecorder()
     
-    print("\nRecording Options:")
-    print("1. Local Recording (MacBook Microphone only)")
-    print("2. Online Recording (External Microphone + BlackHole)")
-    print("3. List Available Devices")
-    print("4. Exit")
+    print("\nMacBook Pro Microphone Recorder")
+    print("1. Start Recording")
+    print("2. List Available Devices")
+    print("3. Exit")
     
     while True:
-        choice = input("\nSelect option (1-4): ")
+        choice = input("\nSelect option (1-3): ")
         
         if choice == "1":
-            print("\nStarting local recording using MacBook microphone...")
-            if recorder.setup_local_recording():
-                recorder.start_recording()
+            print("\nStarting recording...")
+            if recorder.start_recording():
+                recorder.stop_recording()
             break
             
         elif choice == "2":
-            print("\nStarting online recording setup...")
-            print("\nSetup Instructions:")
-            print("1. In macOS Audio MIDI Setup:")
-            print("   - Create a Multi-Output Device")
-            print("   - Select both your headphones/speakers AND BlackHole")
-            print("   - Set this Multi-Output Device as your system output")
-            print("2. In Zoom/Chrome:")
-            print("   - Set the Multi-Output Device as your speaker")
-            
-            input("\nPress Enter when you've completed the setup...")
-            
-            if recorder.setup_online_recording():
-                recorder.start_recording()
-            break
+            recorder.list_devices()
             
         elif choice == "3":
-            recorder.list_audio_devices()
-            
-        elif choice == "4":
             print("Exiting...")
             break
             
         else:
-            print("Invalid choice. Please select 1-4.")
+            print("Invalid choice. Please select 1-3.")
 
 if __name__ == "__main__":
     main()
