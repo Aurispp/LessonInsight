@@ -1,0 +1,91 @@
+to continue : 
+
+
+(venv) (base) aurisp@MacBookPro src % python main.py
+/Users/aurisp/repos/lessoninsight/venv/lib/python3.12/site-packages/pyannote/audio/core/io.py:43: UserWarning: torchaudio._backend.set_audio_backend has been deprecated. With dispatcher enabled, this function is no-op. You can remove the function call.
+  torchaudio.set_audio_backend("soundfile")
+/Users/aurisp/repos/lessoninsight/venv/lib/python3.12/site-packages/pyannote/audio/pipelines/speaker_verification.py:43: UserWarning: torchaudio._backend.get_audio_backend has been deprecated. With dispatcher enabled, this function is no-op. You can remove the function call.
+  backend = torchaudio.get_audio_backend()
+INFO:speechbrain.utils.quirks:Applied quirks (see `speechbrain.utils.quirks`): [disable_jit_profiling, allow_tf32]
+INFO:speechbrain.utils.quirks:Excluded quirks specified by the `SB_DISABLE_QUIRKS` environment (comma-separated list): []
+/Users/aurisp/repos/lessoninsight/venv/lib/python3.12/site-packages/pyannote/audio/pipelines/speaker_verification.py:45: UserWarning: Module 'speechbrain.pretrained' was deprecated, redirecting to 'speechbrain.inference'. Please update your script. This is a change from SpeechBrain 1.0. See: https://github.com/speechbrain/speechbrain/releases/tag/v1.0.0
+  from speechbrain.pretrained import (
+/Users/aurisp/repos/lessoninsight/venv/lib/python3.12/site-packages/pyannote/audio/pipelines/speaker_verification.py:53: UserWarning: torchaudio._backend.set_audio_backend has been deprecated. With dispatcher enabled, this function is no-op. You can remove the function call.
+  torchaudio.set_audio_backend(backend)
+/Users/aurisp/repos/lessoninsight/venv/lib/python3.12/site-packages/pyannote/audio/tasks/segmentation/mixins.py:37: UserWarning: `torchaudio.backend.common.AudioMetaData` has been moved to `torchaudio.AudioMetaData`. Please update the import path.
+  from torchaudio.backend.common import AudioMetaData
+INFO:audio.schedule:Config directory ensured at /Users/aurisp/repos/lessoninsight/config
+INFO:audio.schedule:Loaded class configuration with 1 classes
+INFO:audio.schedule:Loaded profile configuration with 0 profiles
+WARNING:__main__:No HuggingFace token found in environment
+Successfully loaded HuggingFace token
+INFO:audio.speaker_manager:Loading speaker recognition model...
+INFO:speechbrain.utils.fetching:Fetch hyperparams.yaml: Fetching from HuggingFace Hub 'speechbrain/spkrec-ecapa-voxceleb' if not cached
+INFO:speechbrain.utils.fetching:Fetch custom.py: Fetching from HuggingFace Hub 'speechbrain/spkrec-ecapa-voxceleb' if not cached
+/Users/aurisp/repos/lessoninsight/venv/lib/python3.12/site-packages/speechbrain/utils/autocast.py:68: FutureWarning: `torch.cuda.amp.custom_fwd(args...)` is deprecated. Please use `torch.amp.custom_fwd(args..., device_type='cuda')` instead.
+  wrapped_fwd = torch.cuda.amp.custom_fwd(fwd, cast_inputs=cast_inputs)
+INFO:speechbrain.utils.fetching:Fetch embedding_model.ckpt: Fetching from HuggingFace Hub 'speechbrain/spkrec-ecapa-voxceleb' if not cached
+INFO:speechbrain.utils.fetching:Fetch mean_var_norm_emb.ckpt: Fetching from HuggingFace Hub 'speechbrain/spkrec-ecapa-voxceleb' if not cached
+INFO:speechbrain.utils.fetching:Fetch classifier.ckpt: Fetching from HuggingFace Hub 'speechbrain/spkrec-ecapa-voxceleb' if not cached
+INFO:speechbrain.utils.fetching:Fetch label_encoder.txt: Fetching from HuggingFace Hub 'speechbrain/spkrec-ecapa-voxceleb' if not cached
+INFO:speechbrain.utils.parameter_transfer:Loading pretrained files for: embedding_model, mean_var_norm_emb, classifier, label_encoder
+/Users/aurisp/repos/lessoninsight/venv/lib/python3.12/site-packages/speechbrain/utils/checkpoints.py:200: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  state_dict = torch.load(path, map_location=device)
+/Users/aurisp/repos/lessoninsight/venv/lib/python3.12/site-packages/speechbrain/processing/features.py:1311: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  stats = torch.load(path, map_location=device)
+INFO:audio.speaker_manager:Loaded 3 speaker profiles
+
+LessonInsight Menu
+1. Transcribe recordings
+2. Manage classes
+3. Exit
+
+Enter your choice (1-3): 1
+INFO:__main__:
+Looking for recordings in: /Users/aurisp/repos/lessoninsight/audio_files
+INFO:__main__:
+Available recordings:
+0: recording_2024-12-19_15-45-03.wav (133.1MB, Thursday 15:45)
+1: recording_2024-12-10_15-00-40.wav (301.6MB, Tuesday 14:00)
+2: recording_2024-12-10_14-24-26.wav (25.8MB, Tuesday 13:24)
+3: recording_2024-12-09_21-00-52.wav (667.5MB, Monday 20:00)
+4: recording_2024-12-04_12-03-42.wav (623.6MB, Wednesday 11:03 ( - near class time))
+5: recording_2024-12-04_09-20-58.wav (4.9MB, Wednesday 08:20)
+6: recording_2024-12-03_08-57-45.wav (9.1MB, Tuesday 07:57)
+7: recording_2024-11-29_12-14-50.wav (1006.6MB, Friday 11:14)
+8: recording_2024-11-28_17-31-12.wav (775.7MB, Thursday 16:31)
+9: recording_2024-11-28_16-16-30.wav (17.0MB, Thursday 15:16)
+10: recording_2024-11-27_14-02-28.wav (487.3MB, Wednesday 13:02 ( - during class))
+11: recording_2024-11-27_13-09-25.wav (36.3MB, Wednesday 12:09 ( - near class time))
+12: recording_2024-11-08_10-40-10.wav (15.7MB, Sunday 14:11)
+
+Enter the number of the recording to transcribe (or -1 to return): 11
+
+Recording matches  (near class time)
+Time: Wednesday 13:00 to 14:00
+Starting transcription of: /Users/aurisp/repos/lessoninsight/audio_files/recording_2024-11-27_13-09-25.wav
+
+Detected class: 
+Time: Wednesday 13:00 to 14:00
+Students in class: 1
+- Monica
+No language specified, language will be first be detected for each audio file (increases inference time).
+Lightning automatically upgraded your loaded checkpoint from v1.5.4 to v2.4.0. To apply the upgrade to your files permanently, run `python -m pytorch_lightning.utilities.upgrade_checkpoint ../../../.cache/torch/whisperx-vad-segmentation.bin`
+Model was trained with pyannote.audio 0.0.1, yours is 3.1.1. Bad things might happen unless you revert pyannote.audio to 0.x.
+Model was trained with torch 1.10.0+cu102, yours is 2.5.1. Bad things might happen unless you revert torch to 1.x.
+Detected language: en (0.98) in first 30s of audio...
+Detected language: en
+Performing speaker diarization...
+INFO:audio.transcriber:Adjusting for class size: expecting up to 2 speakers
+/Users/aurisp/repos/lessoninsight/venv/lib/python3.12/site-packages/pyannote/audio/models/blocks/pooling.py:104: UserWarning: std(): degrees of freedom is <= 0. Correction should be strictly less than the reduction factor (input numel divided by output numel). (Triggered internally at /Users/runner/work/pytorch/pytorch/pytorch/aten/src/ATen/native/ReduceOps.cpp:1823.)
+  std = sequences.std(dim=-1, correction=1)
+
+
+ERROR:audio.transcriber:Error during diarization: 'DataFrame' object has no attribute 'segments'
+ERROR:audio.transcriber:Error during transcription: 'time'
+
+Enter the number of the recording to transcribe (or -1 to return): Please enter a valid number
+
+Enter the number of the recording to transcribe (or -1 to return): Please enter a valid number
+
+Enter the number of the recording to transcribe (or -1 to return): 

@@ -1,0 +1,58 @@
+{
+  "version": "1.0",
+  "last_updated": "2024-12-28T19:33:42.211556",
+  "classes": {
+    "class_20241226_190620": {
+      "name": "",
+      "description": "",
+      "schedule": [
+        {
+          "day": "Wednesday",
+          "start_time": "13:00",
+          "end_time": "14:00"
+        }
+      ],
+      "max_students": 1,
+      "students": [
+        {
+          "name": "Monica",
+          "profile_id": null,
+          "added_at": "2024-12-26T19:06:20.799469"
+        }
+      ],
+      "created_at": "2024-12-26T19:06:20.799469",
+      "updated_at": "2024-12-26T19:06:20.799469"
+    },
+    "class_20241228_193342": {
+      "name": "Lipotec Tuesday",
+      "description": "",
+      "schedule": [
+        {
+          "day": "Tuesday",
+          "start_time": "08:00",
+          "end_time": "09:30"
+        }
+      ],
+      "max_students": 3,
+      "students": [
+        {
+          "name": "Marga",
+          "profile_id": null,
+          "added_at": "2024-12-28T19:33:42.211190"
+        },
+        {
+          "name": "Andrea",
+          "profile_id": null,
+          "added_at": "2024-12-28T19:33:42.211190"
+        },
+        {
+          "name": "Pedro",
+          "profile_id": null,
+          "added_at": "2024-12-28T19:33:42.211190"
+        }
+      ],
+      "created_at": "2024-12-28T19:33:42.211190",
+      "updated_at": "2024-12-28T19:33:42.211190"
+    }
+  }
+}
