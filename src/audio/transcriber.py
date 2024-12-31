@@ -386,43 +386,77 @@ class LessonTranscriber:
     def assign_speakers_to_words(self, diarize_segments: List[Dict], whisper_segments: List[Dict]) -> List[Dict]:
         """Custom implementation to assign speakers to word-level segments"""
         try:
+            logger.info("Starting speaker assignment to words...")
+            logger.info(f"Number of diarization segments: {len(diarize_segments)}")
+            logger.info(f"Number of whisper segments: {len(whisper_segments)}")
+            
             # Convert diarization segments to pandas DataFrame
             diarize_df = pd.DataFrame(diarize_segments)
             result_segments = []
             
-            for segment in whisper_segments:
+            for i, segment in enumerate(whisper_segments):
+                logger.debug(f"Processing whisper segment {i}: {segment}")
+                
                 if "words" not in segment:
+                    logger.warning(f"No words found in segment {i}")
                     continue
-                    
+                
                 segment_speakers = []
                 for word in segment["words"]:
-                    word_start = float(word["start"])
-                    word_end = float(word["end"])
+                    # Validate word structure
+                    if not isinstance(word, dict):
+                        logger.warning(f"Invalid word format in segment {i}: {word}")
+                        continue
+                        
+                    # Check required keys
+                    required_keys = ["start", "end"]
+                    missing_keys = [key for key in required_keys if key not in word]
+                    if missing_keys:
+                        logger.warning(f"Missing keys {missing_keys} in word: {word}")
+                        continue
                     
-                    # Find overlapping speaker segments
-                    overlaps = diarize_df[
-                        (diarize_df["start"] <= word_end) & 
-                        (diarize_df["end"] >= word_start)
-                    ]
-                    
-                    if not overlaps.empty:
-                        # Get the speaker with most overlap
-                        intersections = np.minimum(overlaps["end"], word_end) - np.maximum(overlaps["start"], word_start)
-                        speaker = overlaps.iloc[intersections.argmax()]["speaker"]
-                        word["speaker"] = speaker
-                        segment_speakers.append(speaker)
-                    else:
+                    try:
+                        word_start = float(word["start"])
+                        word_end = float(word["end"])
+                        
+                        # Find overlapping speaker segments
+                        overlaps = diarize_df[
+                            (diarize_df["start"] <= word_end) & 
+                            (diarize_df["end"] >= word_start)
+                        ]
+                        
+                        if not overlaps.empty:
+                            # Get the speaker with most overlap
+                            intersections = np.minimum(overlaps["end"], word_end) - np.maximum(overlaps["start"], word_start)
+                            speaker = overlaps.iloc[intersections.argmax()]["speaker"]
+                            word["speaker"] = speaker
+                            segment_speakers.append(speaker)
+                            logger.debug(f"Matched word '{word.get('text', '')}' to speaker {speaker}")
+                        else:
+                            word["speaker"] = "UNKNOWN"
+                            segment_speakers.append("UNKNOWN")
+                            logger.debug(f"No speaker match for word '{word.get('text', '')}'")
+                    except (ValueError, KeyError) as e:
+                        logger.warning(f"Error processing word in segment {i}: {e}")
                         word["speaker"] = "UNKNOWN"
                         segment_speakers.append("UNKNOWN")
-                
+                    
                 # Assign most common speaker to the segment
                 if segment_speakers:
                     from collections import Counter
-                    segment["speaker"] = Counter(segment_speakers).most_common(1)[0][0]
+                    speaker_counts = Counter(segment_speakers)
+                    most_common_speaker = speaker_counts.most_common(1)[0][0]
+                    segment["speaker"] = most_common_speaker
+                    logger.info(f"Assigned speaker {most_common_speaker} to segment {i} (word count: {len(segment_speakers)})")
+                else:
+                    segment["speaker"] = "UNKNOWN"
+                    logger.warning(f"No speaker assigned to segment {i}")
                 
                 result_segments.append(segment)
             
+            logger.info(f"Completed speaker assignment. Processed {len(result_segments)} segments")
             return result_segments
+            
         except Exception as e:
             logger.error(f"Error assigning speakers to words: {str(e)}")
             logger.exception("Full traceback:")

@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "last_updated": "2024-12-28T19:33:42.211556",
+  "last_updated": "2024-12-31T18:17:42.718104",
   "classes": {
     "class_20241226_190620": {
       "name": "",
@@ -16,7 +16,7 @@
       "students": [
         {
           "name": "Monica",
-          "profile_id": null,
+          "profile_id": "profile_20241227_165557",
           "added_at": "2024-12-26T19:06:20.799469"
         }
       ],
@@ -53,6 +53,53 @@
       ],
       "created_at": "2024-12-28T19:33:42.211190",
       "updated_at": "2024-12-28T19:33:42.211190"
+    },
+    "class_20241229_094158": {
+      "name": "Claudia and Marti",
+      "description": "",
+      "schedule": [
+        {
+          "day": "Thursday",
+          "start_time": "16:00",
+          "end_time": "17:30"
+        }
+      ],
+      "max_students": 2,
+      "students": [
+        {
+          "name": "Claudia",
+          "profile_id": null,
+          "added_at": "2024-12-29T09:41:58.410815"
+        },
+        {
+          "name": "Marti",
+          "profile_id": null,
+          "added_at": "2024-12-29T09:41:58.410815"
+        }
+      ],
+      "created_at": "2024-12-29T09:41:58.410815",
+      "updated_at": "2024-12-29T09:41:58.410815"
+    },
+    "class_20241231_181742": {
+      "name": "Oriol",
+      "description": "",
+      "schedule": [
+        {
+          "day": "Monday",
+          "start_time": "20:00",
+          "end_time": "21:00"
+        }
+      ],
+      "max_students": 1,
+      "students": [
+        {
+          "name": "Oriol",
+          "profile_id": null,
+          "added_at": "2024-12-31T18:17:42.717713"
+        }
+      ],
+      "created_at": "2024-12-31T18:17:42.717713",
+      "updated_at": "2024-12-31T18:17:42.717713"
     }
   }
 }

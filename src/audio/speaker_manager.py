@@ -35,8 +35,50 @@ class SpeakerManager:
         self._load_profiles()
         logger.info(f"Loaded {len(self.profiles)} speaker profiles")
 
+
+    def _validate_and_clean_segments(self, segments: List[Dict]) -> List[Dict]:
+        """Validate and clean segments before processing"""
+        if not segments:
+            logger.warning("No segments provided for validation")
+            return []
+            
+        valid_segments = []
+        for i, segment in enumerate(segments):
+            try:
+                # Check required fields
+                if "start" not in segment or "end" not in segment:
+                    logger.warning(f"Segment {i} missing start/end time: {segment}")
+                    continue
+                    
+                if "speaker" not in segment:
+                    logger.warning(f"Segment {i} missing speaker: {segment}")
+                    continue
+                    
+                # Validate timing
+                start = float(segment["start"])
+                end = float(segment["end"])
+                
+                if end <= start:
+                    logger.warning(f"Segment {i} has invalid timing: start={start}, end={end}")
+                    continue
+                    
+                if end - start < 0.1:  # Skip extremely short segments
+                    logger.warning(f"Segment {i} too short ({end-start}s), skipping")
+                    continue
+                    
+                valid_segments.append(segment)
+                
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Error validating segment {i}: {e}")
+                continue
+                
+        logger.info(f"Validated {len(valid_segments)}/{len(segments)} segments")
+        return valid_segments
+
     def match_speakers_with_profiles(self, audio: np.ndarray, segments: List[Dict], class_info: Optional[Dict] = None) -> List[Dict]:
         """Match diarized speakers with known profiles"""
+        # Validate segments first
+        segments = self._validate_and_clean_segments(segments)
         if not segments:
             return segments
 

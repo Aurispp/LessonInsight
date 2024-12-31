@@ -104,18 +104,56 @@ class LessonInsightApp:
             # Get class information
             class_info = self.class_manager.get_class_for_time(recording_time)
             
-            # If no class found, offer to assign one
-            if not class_info:
+            # Show matched class and get confirmation
+            if class_info:
+                print(f"\nRecording time matches:")
+                print(f"Class: {class_info['name']}")
+                print(f"Time: {class_info['matched_schedule']['day']} {class_info['matched_schedule']['start_time']} to {class_info['matched_schedule']['end_time']}")
+                print(f"Students:")
+                for student in class_info['students']:
+                    print(f"- {student['name']}")
+                
+                while True:
+                    print("\nOptions:")
+                    print("1. Proceed with this class")
+                    print("2. Select a different class")
+                    print("3. Return to menu")
+                    
+                    choice = input("\nEnter your choice (1-3): ").strip()
+                    
+                    if choice == "1":
+                        break  # Proceed with current class_info
+                    elif choice == "2":
+                        class_info = self._assign_recording_to_class()
+                        if not class_info:
+                            return  # User cancelled or no class selected
+                        break
+                    elif choice == "3":
+                        return
+                    else:
+                        print("Invalid choice. Please enter 1, 2, or 3.")
+            else:
                 print("\nNo matching class found for this recording time.")
                 if input("Would you like to assign this recording to a class? (y/n): ").lower() == 'y':
                     class_info = self._assign_recording_to_class()
+                    if not class_info:
+                        return  # User cancelled or no class selected
+                else:
+                    return
+            
+            print(f"\nStarting transcription of: {recording_path}")
             
             if class_info:
                 status = "during class" if class_info.get("is_during_class") else "near class time"
-                print(f"\nRecording matches {class_info['name']} ({status})")
+                print(f"\nDetected class: {class_info['name']}")
                 print(f"Time: {class_info['matched_schedule']['day']} {class_info['matched_schedule']['start_time']} to {class_info['matched_schedule']['end_time']}")
+                if class_info.get('students'):
+                    print(f"Students in class: {len(class_info['students'])}")
+                    for student in class_info['students']:
+                        print(f"- {student['name']}")
             
             self.transcriber.transcribe_audio(recording_path, recording_time, class_info)
+            
         except Exception as e:
             logger.error(f"Error transcribing recording: {e}")
 
@@ -128,17 +166,31 @@ class LessonInsightApp:
         
         print("\nAvailable classes:")
         for i, class_info in enumerate(classes, 1):
-            print(f"{i}. {class_info['name']}")
+            print(f"\n{i}. {class_info['name']}")
             for schedule in class_info['schedule']:
                 print(f"   {schedule['day']}: {schedule['start_time']} to {schedule['end_time']}")
+            print(f"   Students: {len(class_info.get('students', []))}/{class_info.get('max_students', 0)}")
+            for student in class_info.get('students', []):
+                print(f"   - {student['name']}")
         
-        try:
-            idx = int(input("\nEnter class number (or 0 to skip): ").strip())
-            if 0 < idx <= len(classes):
-                return classes[idx-1]
-        except ValueError:
-            print("Invalid input")
-        
+        while True:
+            try:
+                choice = input("\nEnter class number (or 0 to cancel): ").strip()
+                if choice == "0":
+                    return None
+                    
+                idx = int(choice)
+                if 0 < idx <= len(classes):
+                    selected_class = classes[idx-1]
+                    print(f"\nSelected: {selected_class['name']}")
+                    print(f"Time: {selected_class['matched_schedule']['day']} {selected_class['matched_schedule']['start_time']} to {selected_class['matched_schedule']['end_time']}")
+                    if input("Confirm selection? (y/n): ").lower() == 'y':
+                        return selected_class
+                else:
+                    print(f"Please enter a number between 0 and {len(classes)}")
+            except ValueError:
+                print("Invalid input")
+            
         return None
 
     def manage_classes(self):
